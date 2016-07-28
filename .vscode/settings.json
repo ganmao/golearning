@@ -1,0 +1,19 @@
+{
+    // 读取和编写文件时将使用的默认字符集编码。
+    "files.encoding": "utf8",
+    
+    "go.buildOnSave": true,
+    "go.lintOnSave": true,
+    "go.vetOnSave": true,
+    "go.buildTags": "",
+    "go.buildFlags": [],
+    "go.lintFlags": [],
+    "go.vetFlags": [],
+    "go.coverOnSave": false,
+    "go.useCodeSnippetsOnFunctionSuggest": false,
+    "go.formatOnSave": true,
+    "go.formatTool": "goreturns",
+    "go.goroot": "c:/Go",
+    "go.gopath": "d:/MyWork/GOPATH",
+    "go.gocodeAutoBuild": false
+}
