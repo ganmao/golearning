@@ -3,18 +3,23 @@ package main
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 )
 
-func NewCBCDecrypter() {
-	key := []byte("example key 1234")
-	ciphertext, _ := hex.DecodeString("f363f3ccdcb12bb883abf484ba77d9cd7d32b5baecb3d4b1b3e0e4beffdb3ded")
-
+// NewCBCDecrypter 使用AES(CBC)模式解密
+func NewCBCDecrypter(inKey []byte, inCiphertext []byte, inIV []byte) (outPlanText []byte) {
+	key := inKey
+	ciphertext := inCiphertext
+	iv := inIV
+	/*
+		fmt.Printf("====\n")
+		fmt.Printf("key=%s\n", key)
+		fmt.Printf("ciphertext=%x\n", ciphertext)
+		fmt.Printf("iv=%x\n", iv)
+		fmt.Printf("====\n")
+	*/
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		panic(err)
@@ -25,8 +30,6 @@ func NewCBCDecrypter() {
 	if len(ciphertext) < aes.BlockSize {
 		panic("ciphertext too short")
 	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
 
 	// CBC mode always works in whole blocks.
 	if len(ciphertext)%aes.BlockSize != 0 {
@@ -38,21 +41,13 @@ func NewCBCDecrypter() {
 	// CryptBlocks can work in-place if the two arguments are the same.
 	mode.CryptBlocks(ciphertext, ciphertext)
 
-	// If the original plaintext lengths are not a multiple of the block
-	// size, padding would have to be added when encrypting, which would be
-	// removed at this point. For an example, see
-	// https://tools.ietf.org/html/rfc5246#section-6.2.3.2. However, it's
-	// critical to note that ciphertexts must be authenticated (i.e. by
-	// using crypto/hmac) before being decrypted in order to avoid creating
-	// a padding oracle.
-
-	fmt.Printf("ciphertext = %s\n", ciphertext)
-	// Output: exampleplaintext
+	return ciphertext
 }
 
-func NewCBCEncrypter(inKey []byte, inPlantext string) (outCiphertext []byte, usedIV []byte) {
+// NewCBCEncrypter 使用AES(CBC)模式加密
+func NewCBCEncrypter(inKey []byte, inPlantext []byte) (outCiphertext []byte, usedIV []byte) {
 	key := inKey
-	plaintext := []byte(inPlantext)
+	plaintext := inPlantext
 
 	// CBC mode works on blocks so plaintexts may need to be padded to the
 	// next whole block. For an example of such padding, see
@@ -69,21 +64,20 @@ func NewCBCEncrypter(inKey []byte, inPlantext string) (outCiphertext []byte, use
 
 	// The IV needs to be unique, but not secure. Therefore it's common to
 	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
+	iv := make([]byte, aes.BlockSize)
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		panic(err)
 	}
 
 	mode := cipher.NewCBCEncrypter(block, iv)
-	mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+	mode.CryptBlocks(plaintext, plaintext)
 
 	// It's important to remember that ciphertexts must be authenticated
 	// (i.e. by using crypto/hmac) as well as being encrypted in order to
 	// be secure.
 
 	//fmt.Printf("ciphertext = %x\n", ciphertext)
-	return ciphertext, iv
+	return plaintext, iv
 }
 
 func translationBinaryToChar(inBinary []byte) (outChar []byte) {
@@ -93,7 +87,7 @@ func translationBinaryToChar(inBinary []byte) (outChar []byte) {
 	}
 
 	j := 0
-	oChar := make([]byte, 68)
+	oChar := make([]byte, 32)
 	for _, value := range inBinary {
 		oChar[j] = value&0x0f + 'A'
 		j++
@@ -105,18 +99,17 @@ func translationBinaryToChar(inBinary []byte) (outChar []byte) {
 
 func main() {
 	key := []byte("CBSV5R5SrvPubKey")
+	planText := []byte("1234567890123456")
 
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte("108000000000000001|2000|2114380800"))
-	//expectedMAC := mac.Sum([]byte("1"))
-	expectedMAC := mac.Sum(nil)
-	fmt.Printf("expectedMAC = %v\n", expectedMAC)
-	fmt.Printf("expectedMAC = %v\n", string(expectedMAC))
-	fmt.Printf("expectedMAC = %v\n", hex.EncodeToString(expectedMAC))
-	outstr := translationBinaryToChar(expectedMAC)
-	fmt.Printf("expectedMAC = %v\n", string(outstr))
-
-	oCiphertext, uIV := NewCBCEncrypter(key, "1234567890123456")
-	fmt.Printf("expectedAES = %x\nUsed IV = %x\n", oCiphertext, uIV)
-	NewCBCDecrypter()
+	oCiphertext, uIV := NewCBCEncrypter(key, planText)
+	fmt.Printf("ciphertext = %x\nUsed IV = %x\n", oCiphertext, uIV)
+	outstr := translationBinaryToChar(oCiphertext)
+	fmt.Printf("B2C = %x\n", outstr)
+	/*
+		fmt.Printf("key=%s\n", key)
+		fmt.Printf("ciphertext=%x\n", oCiphertext)
+		fmt.Printf("iv=%x\n", uIV)
+	*/
+	oChar := NewCBCDecrypter(key, oCiphertext, uIV)
+	fmt.Printf("planText = %s\n", oChar)
 }
